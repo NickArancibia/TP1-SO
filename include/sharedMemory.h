@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <semaphore.h>
+#include <fcntl.h>
 #include "definitions.h"
 
 typedef struct {
