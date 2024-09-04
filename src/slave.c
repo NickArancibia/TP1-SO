@@ -1,3 +1,6 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -7,6 +10,8 @@
 #include <sys/wait.h>
 //#include <definitions.h>
 #define MAXFILELEN 100
+
+char * md5Path = "/usr/bin/md5sum";
 
 void createChild(char *str);
 
@@ -41,7 +46,7 @@ void createChild(char *str){
     }
 
     if(pid == 0){
-        char *argv[] = {"/usr/bin/md5sum", str, NULL};
+        char *argv[] = {md5Path, str, NULL};
         execve("/usr/bin/md5sum", argv, NULL);
 
         fprintf(stderr,"Execve error\n"); //TODO: chequear si esta bien el mensaje de error.
