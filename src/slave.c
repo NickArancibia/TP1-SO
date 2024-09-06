@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
 
-    char buffer[MAXFILELEN];
+    char buffer[MAXFILELEN]={0};
     int bytesread;
 
     while((bytesread = read(STDIN_FILENO, buffer, MAXFILELEN)) != 0){
