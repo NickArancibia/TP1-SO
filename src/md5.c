@@ -10,6 +10,7 @@
 #define SHM_NAME "sharedMemory"
 #define INTIAL_LOAD 2 
 
+
 void sendData(int fd, const char * message);
 void * createSharedMemory(char* name,int size, int* fd);
 
@@ -23,6 +24,8 @@ int main(int argc, char const *argv[])
     *((int *)(shm_ptrBase)) = filesQty;
     sem_t *semAddress = (sem_t *)shm_ptrBase + sizeof(argc);
     message* output = (message *)(shm_ptrBase + sizeof(sem_t) + sizeof(filesQty));
+    int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*filesQty;
+    char* bufferPipe = calloc(INTIAL_LOAD,sizeBufferPipe);
 
     if (sem_init(semAddress, 1, 0) == -1) {
         perror("sem_init");
@@ -108,29 +111,28 @@ int main(int argc, char const *argv[])
         select(pipesFd[7][0]+1,&read_fds,NULL,NULL,NULL);
         for(int j= 1,i=0; i < CHILDS_QTY ;i++,j+=2) {
             if(FD_ISSET(pipesFd[i*2+1][0],&read_fds)) {
-		        char entryPipe[MD5LEN+FILENAME_MAX+2]={'\0'};
-                int nullTerminated = read(pipesFd[j][0],entryPipe,MD5LEN+FILENAME_MAX);
+		        char* token;
+                int nullTerminated = read(pipesFd[j][0],bufferPipe,sizeBufferPipe);
                 if(nullTerminated == -1){
                     perror("read");
                     exit(EXIT_FAILURE);
                 }
-                entryPipe[nullTerminated] = '\0';
-                char * spacePos = strchr(entryPipe, ' ');
-                if(spacePos == NULL){
-                    perror("strchr");
-                    // TODO: Close pipes and unmap
-                    exit(EXIT_FAILURE);
+                bufferPipe[nullTerminated] = '\0';
+                token = strtok(bufferPipe," \n");
+                while (token != NULL)
+                {      
+                    strcpy(output[idxOut].md5,token);
+                    token = strtok(NULL," \n");                    
+                    strncpy(output[idxOut].filename,token, MAXFILELEN);
+                    output[idxOut].pid = pids[i];
+                    char tmpBuffer[sizeof("Filename: %s - PID: %d - MD5: %s\n") + MD5LEN + MAXFILELEN + 2]={'\0'};
+                    snprintf(tmpBuffer, sizeof(tmpBuffer),"Filename: %s - PID: %d - MD5: %s\n", output[idxOut].filename, pids[i], output[idxOut].md5);
+                    sem_post(semAddress);
+                    write(fdResults,tmpBuffer,strlen(tmpBuffer));
+                    idxOut++;
+                    token = strtok(NULL," \n");
                 }
-                *spacePos = '\0'; 
-                char* fileName = spacePos +1;
-                strncpy(output[idxOut].md5, entryPipe, MD5LEN);
-                strncpy(output[idxOut].filename,fileName, strlen(fileName));
-                output[idxOut].pid = pids[i];
-		        sem_post(semAddress);
-                char buffer[FILENAME_MAX + MD5LEN + 2];
-                snprintf(buffer, sizeof(buffer),"Filename: %s - PID: %d - MD5: %s\n", fileName, pids[i], entryPipe);
-                write(fdResults,buffer,strlen(buffer));
-		        idxOut++;
+                
                 if(filesQty >0){
                     sendData(pipesFd[j-1][1],argv[index++]);
                     filesQty--;
@@ -147,11 +149,13 @@ int main(int argc, char const *argv[])
     for (int j=0;j< 4; j++) {
         waitpid(pids[j],NULL,0);
     }
+    free(bufferPipe);
     close(fdResults);
     munmap(shm_ptrBase, shmSize);
     close(shmFd);
     shm_unlink(SHM_NAME);
     write(STDOUT_FILENO, "\n", 1);
+
     return 0;
 }
 
