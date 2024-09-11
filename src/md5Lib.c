@@ -46,10 +46,10 @@ int createChildsAndPipes (int childsQty,int  md5SendData[][2],int  slaveSendData
 
 
 
-void sendData(int fd,char const *message[],int* dataLeft,int* idx,int qty, int dataSize) {
+void sendData(int fd, const char *message[],int* dataLeft,int* idx,int qty, int dataSize) {
 
     char* tmpBuffer = calloc(qty,dataSize);
-    int sizeTotal = qty*dataSize;
+    int sizeTotal = qty*dataSize; 
     int len = 0;
     tmpBuffer[len] = '\0';
     if(*dataLeft > 0){
@@ -62,8 +62,10 @@ void sendData(int fd,char const *message[],int* dataLeft,int* idx,int qty, int d
         (*dataLeft)--;
         (*idx)++;
     }
+    
     snprintf(tmpBuffer + len, sizeTotal - len, "\n");
-    write(fd,tmpBuffer,sizeTotal);
+   
+    write(fd,tmpBuffer,strlen(tmpBuffer));
     }
     free(tmpBuffer);
 }

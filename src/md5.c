@@ -17,6 +17,7 @@ void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty);
 
 int main(int argc, char const *argv[])
 {
+    
     int filesQty = argc - 1;
     int shmSize = sizeof(argc) + sizeof(message) * filesQty;
     int shmFd,index =1,idxOut=0;
@@ -32,7 +33,7 @@ int main(int argc, char const *argv[])
         ERRORMSG("sem_init")
     }
 
-    int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*filesQty;
+    int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*INTIAL_LOAD;
     char* bufferPipe = calloc(INTIAL_LOAD,sizeBufferPipe);
 
     int md5SendData[CHILDS_QTY][2],slaveSendData[CHILDS_QTY][2];
@@ -41,7 +42,7 @@ int main(int argc, char const *argv[])
     write(STDOUT_FILENO, SHM_NAME, strlen(SHM_NAME));
     sleep(3);
     createChildsAndPipes(childsQty,md5SendData,slaveSendData,pids);
- 
+
     int fdResults = open("results.txt", O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdResults == -1) {
         free(bufferPipe);
@@ -58,15 +59,10 @@ int main(int argc, char const *argv[])
     while (idxOut < (argc-1)) {
 
 	    listenChilds(&read_fds,slaveSendData,childsQty);
-        
         for(int i=0; i < childsQty ;i++) {
             if(FD_ISSET(slaveSendData[i][0],&read_fds)) {
 		        char* token;
                 int nullTerminated = read(slaveSendData[i][0],bufferPipe,sizeBufferPipe);
-                if(nullTerminated == -1){
-                    perror("read");
-                    exit(EXIT_FAILURE);
-                }
                 bufferPipe[nullTerminated] = '\0';
                 token = strtok(bufferPipe," \n");
                 while (token != NULL)
@@ -89,6 +85,7 @@ int main(int argc, char const *argv[])
             }
         }
     }
+    
     sem_close(semAddress);
     sem_unlink(SHM_NAME);
     for (int j=0;j< childsQty; j++) {
