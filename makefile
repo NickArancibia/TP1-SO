@@ -12,10 +12,10 @@ slave: $(SRC_DIR)/slave.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 md5: $(SRC_DIR)/md5.c
-	$(CC) $(CFLAGS) -D_XOPEN_SOURCE=500 -o $@ $<
+	$(CC) $(CFLAGS) -D_XOPEN_SOURCE=500 -o $@ $(SRC_DIR)/sharedMemory.c $(SRC_DIR)/md5Lib.c $(SRC_DIR)/md5.c 
 
 vista: $(SRC_DIR)/vista.c
-	$(CC) $(CFLAGS)  -o $@ $(SRC_DIR)/vista.c $(SRC_DIR)/vistaLib.c
+	$(CC) $(CFLAGS)  -o $@ $(SRC_DIR)/vistaLib.c $(SRC_DIR)/vista.c 
 
 clean:
 	rm -f $(EXECUTABLES)
