@@ -6,113 +6,67 @@
 #include <sys/select.h>
 #include <sys/wait.h>
 #include "../include/sharedMemory.h"
+#include "../include/vistaLib.h"
 #define CHILDS_QTY 4
 #define SHM_NAME "sharedMemory"
 #define INTIAL_LOAD 2 
+#include "../include/md5Lib.h"
 
 
-void sendData(int fd, const char * message);
-void * createSharedMemory(char* name,int size, int* fd);
+void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
+void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty);
 
 int main(int argc, char const *argv[])
 {
     int filesQty = argc - 1;
     int shmSize = sizeof(argc) + sizeof(sem_t) + sizeof(message) * filesQty;
     int shmFd,index =1,idxOut=0;
-    void * shm_ptrBase = createSharedMemory(SHM_NAME,shmSize,&shmFd);
+    int childsQty = (filesQty > CHILDS_QTY)? CHILDS_QTY:filesQty;
 
+    void * shm_ptrBase = createSharedMemory(SHM_NAME,shmSize,&shmFd);
     *((int *)(shm_ptrBase)) = filesQty;
     sem_t *semAddress = (sem_t *)shm_ptrBase + sizeof(argc);
     message* output = (message *)(shm_ptrBase + sizeof(sem_t) + sizeof(filesQty));
+
     int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*filesQty;
     char* bufferPipe = calloc(INTIAL_LOAD,sizeBufferPipe);
 
+    int md5SendData[CHILDS_QTY][2],slaveSendData[CHILDS_QTY][2];
+    pid_t pids[CHILDS_QTY];
+
     if (sem_init(semAddress, 1, 0) == -1) {
-        perror("sem_init");
-        munmap(shm_ptrBase, shmSize);
-        close(shmFd);
-        shm_unlink(SHM_NAME);
-        exit(EXIT_FAILURE);
+        free(bufferPipe);
+        destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
+        ERRORMSG("sem_init")
     }
 
     write(STDOUT_FILENO, SHM_NAME, strlen(SHM_NAME));
     sleep(3);
-
-    char *const argvC[] = { "./slave", NULL };
-    int pipesFd[2*CHILDS_QTY][2];
-	pid_t pidAux;
-    pid_t pids[CHILDS_QTY];
-
-    for (int i = 0; i < CHILDS_QTY; i++ ) {
-
-        if (pipe(pipesFd[2 * i]) == -1 || pipe(pipesFd[2 * i + 1]) == -1) {
-            perror("Pipe creation failed");
-            exit(EXIT_FAILURE);
-        }
-	    pidAux = fork();
-        if (pidAux == 0) {
-
-            close(pipesFd[2 * i][1]); 
-            close(pipesFd[2 * i + 1][0]);
-
-            close(STDIN_FILENO);
-	        dup(pipesFd[2*i][0]);
-	        close(STDOUT_FILENO);
-	        dup(pipesFd[2*i+1][1]);
-
-	        close(pipesFd[2*i][0]);
-	        close(pipesFd[2*i+1][1]);
-
-	        for (int j = 0,k=0; k < i;k++, j += 2) {
-                close(pipesFd[j][1]);
-                close(pipesFd[j][0]);
-                close(pipesFd[j+1][0]);
-	            close(pipesFd[j+1][1]);
-            }
-            execve("./slave", argvC, NULL);
-            perror("execve failed");
-            exit(EXIT_FAILURE);
-        }
-        else {
-		    pids[i] = pidAux;
-        }
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        close(pipesFd[i*2][0]);
-        close(pipesFd[i*2+1][1]);
-    }
+    createChildsAndPipes(childsQty,md5SendData,slaveSendData,pids);
+ 
 
     int fdResults = open("results.txt", O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdResults == -1) {
-        perror("Error opening results.txt");
-        exit(EXIT_FAILURE);
+        free(bufferPipe);
+        sem_destroy(semAddress);
+        destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
+        ERRORMSG("Error opening results.txt");
     }
 
 
-    for(int i = 0; i<INTIAL_LOAD; i++) {
-        for (int j=0; j<2*CHILDS_QTY; j+=2) {
-            if(filesQty >0){
-		        sendData(pipesFd[j][1],argv[index++]);
-                filesQty--;
-            }
-        }
+    for(int i = 0; i<childsQty; i++) {
+        sendData(md5SendData[i][1],(argv+index),&filesQty,&index,INTIAL_LOAD,MAXFILELEN+1);
     }
 
     fd_set read_fds;
     while (idxOut < (argc-1)) {
 
-	    FD_ZERO(&read_fds);
-        FD_SET(pipesFd[1][0],&read_fds);
-        FD_SET(pipesFd[3][0],&read_fds);
-        FD_SET(pipesFd[5][0],&read_fds);
-        FD_SET(pipesFd[7][0],&read_fds);
-        select(pipesFd[7][0]+1,&read_fds,NULL,NULL,NULL);
-        for(int j= 1,i=0; i < CHILDS_QTY ;i++,j+=2) {
-            if(FD_ISSET(pipesFd[i*2+1][0],&read_fds)) {
+	    listenChilds(&read_fds,slaveSendData,childsQty);
+        
+        for(int i=0; i < childsQty ;i++) {
+            if(FD_ISSET(slaveSendData[i][0],&read_fds)) {
 		        char* token;
-                int nullTerminated = read(pipesFd[j][0],bufferPipe,sizeBufferPipe);
+                int nullTerminated = read(slaveSendData[i][0],bufferPipe,sizeBufferPipe);
                 if(nullTerminated == -1){
                     perror("read");
                     exit(EXIT_FAILURE);
@@ -133,60 +87,53 @@ int main(int argc, char const *argv[])
                     token = strtok(NULL," \n");
                 }
                 
-                if(filesQty >0){
-                    sendData(pipesFd[j-1][1],argv[index++]);
-                    filesQty--;
+                 if(filesQty >0){
+                   sendData(md5SendData[i][1],(argv+index),&filesQty,&index,1,MAXFILELEN+1);
                 }
             }
         }
 
     }
+
+
+
+
+
     sem_close(semAddress);
-    for (int j=0;j< 2* 4; j+=2) {
-        close(pipesFd[j][1]);
-        close(pipesFd[j+1][0]);
+    for (int j=0;j< childsQty; j++) {
+        close(md5SendData[j][1]);
+        close(slaveSendData[j][0]);
     }
-    for (int j=0;j< 4; j++) {
+    for (int j=0;j< childsQty; j++) {
         waitpid(pids[j],NULL,0);
     }
-    free(bufferPipe);
     close(fdResults);
-    munmap(shm_ptrBase, shmSize);
-    close(shmFd);
-    shm_unlink(SHM_NAME);
+    freeResources(bufferPipe,semAddress,SHM_NAME,shm_ptrBase,shmSize,shmFd);
     write(STDOUT_FILENO, "\n", 1);
 
     return 0;
 }
 
-void sendData(int fd,const char* message) {
-    char buffer[MAXFILELEN+2] ={'\0'};
-    snprintf(buffer,sizeof(buffer),"%s\n",message);
-    write(fd,buffer,strlen(buffer));
+
+
+void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty){
+    FD_ZERO(read_fds);
+        for (int i = 0; i < childsQty; i++)
+        {
+             FD_SET(slaveSendData[i][0],read_fds);
+        }
+    select(slaveSendData[childsQty-1][0]+1,read_fds,NULL,NULL,NULL);
 }
 
 
-void * createSharedMemory(char* name,int size, int* fd) {
-    *fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    if (*fd == -1) {
-        perror("shm_open");
-        exit(EXIT_FAILURE);
+void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmSize,int shmFd){
+    if(semAddress != NULL){
+        sem_close(semAddress);
+        sem_destroy(semAddress);
     }
-
-    if (ftruncate(*fd, size) == -1) {
-        perror("ftruncate");
-        close(*fd);
-        shm_unlink(SHM_NAME);
-        exit(EXIT_FAILURE);
+    if(bufferPipe != NULL){
+        free(bufferPipe);
     }
-    void *shm_ptrBase= mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, *fd, 0);
-    if(shm_ptrBase == MAP_FAILED) {
-        perror("ftruncate");
-        close(*fd);
-        shm_unlink(SHM_NAME);
-        exit(EXIT_FAILURE);
-    }
-    return shm_ptrBase;
+    destroySharedMemory(shmName,shmPtr,shmFd,shmSize);
+    
 }
-
-
