@@ -54,6 +54,6 @@ void closeSharedMemory(void *shm_ptr, int size,int fd) {
 
 
 void destroySharedMemory(const char *name, void *shm_ptr, int fd,int size) {
-    closeSharedMemory(shm_ptr, fd,size);
+    closeSharedMemory(shm_ptr, size , fd);
     shm_unlink(name);
 }

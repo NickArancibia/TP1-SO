@@ -49,6 +49,10 @@ int createChildsAndPipes (int childsQty,int  md5SendData[][2],int  slaveSendData
 void sendData(int fd, const char *message[],int* dataLeft,int* idx,int qty, int dataSize) {
 
     char* tmpBuffer = calloc(qty,dataSize);
+    if(tmpBuffer == NULL ){
+        ERRORMSG("Error allocating memory");
+    }
+
     int sizeTotal = qty*dataSize; 
     int len = 0;
     tmpBuffer[len] = '\0';

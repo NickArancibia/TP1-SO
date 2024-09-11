@@ -35,6 +35,10 @@ int main(int argc, char const *argv[])
 
     int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*INTIAL_LOAD;
     char* bufferPipe = calloc(INTIAL_LOAD,sizeBufferPipe);
+    if(bufferPipe == NULL){
+        destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
+        ERRORMSG("Error allocating memory");
+    }
 
     int md5SendData[CHILDS_QTY][2],slaveSendData[CHILDS_QTY][2];
     pid_t pids[CHILDS_QTY];
@@ -63,13 +67,19 @@ int main(int argc, char const *argv[])
             if(FD_ISSET(slaveSendData[i][0],&read_fds)) {
 		        char* token;
                 int nullTerminated = read(slaveSendData[i][0],bufferPipe,sizeBufferPipe);
+                if(nullTerminated == -1){
+                    ERRORMSG("Error reading from pipe");
+                }
                 bufferPipe[nullTerminated] = '\0';
                 token = strtok(bufferPipe," \n");
                 while (token != NULL)
                 {      
                     strcpy(output[idxOut].md5,token);
-                    token = strtok(NULL," \n");                    
-                    strncpy(output[idxOut].filename,token, MAXFILELEN);
+                    token = strtok(NULL," \n");
+                    if(token == NULL){
+                        ERRORMSG("md5sum wrong format");
+                    }
+                    strncpy(output[idxOut].filename, token, MAXFILELEN);
                     output[idxOut].pid = pids[i];
                     char tmpBuffer[sizeof("Filename: %s - PID: %d - MD5: %s\n") + MD5LEN + MAXFILELEN + 2]={'\0'};
                     snprintf(tmpBuffer, sizeof(tmpBuffer),"Filename: %s - PID: %d - MD5: %s\n", output[idxOut].filename, pids[i], output[idxOut].md5);
