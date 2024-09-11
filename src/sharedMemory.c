@@ -1,9 +1,6 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include "../include/sharedMemory.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 void* mapSharedMemory(const char* name, int size, int* fd, int create) {
     int flags = O_RDWR;
@@ -38,17 +35,13 @@ void* mapSharedMemory(const char* name, int size, int* fd, int create) {
     return shm_ptrBase;
 }
 
-
 void* createSharedMemory(char* name, int size, int* fd) {
     return mapSharedMemory(name, size, fd, 1);
 }
 
-
 void* openSharedMemory(char* name, int size, int* fd) {
     return mapSharedMemory(name, size, fd, 0);
 }
-
-
 
 void closeSharedMemory(void *shm_ptr, int size,int fd) {
     if (shm_ptr != NULL && shm_ptr != MAP_FAILED) {

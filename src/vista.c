@@ -20,19 +20,25 @@ int main(int argc, char * argv[]){
     }
 
 	getDataToRead(&dataToRead, memfd);
-    
-    basePtr = mmap(NULL, sizeof(int) + sizeof(sem_t) + sizeof(message) * dataToRead, PROT_READ | PROT_WRITE, MAP_SHARED, memfd, 0);
+    int memSize = sizeof(int) + sizeof(message) * dataToRead;
+
+    basePtr = mmap(NULL, memSize, PROT_READ | PROT_WRITE, MAP_SHARED, memfd, 0);
     if(basePtr == MAP_FAILED){
         close(memfd);
         ERRORMSG("basePtr mmap");
     }
 
-    semaphore = (sem_t *) basePtr + sizeof(int);
-    baseData = (message *) (basePtr + sizeof(sem_t) + sizeof(int)); 
+    semaphore = sem_open(memName, 0);
+    if(semaphore == SEM_FAILED){
+        munmap(basePtr, memSize);
+        close(memfd);
+        ERRORMSG("sem_open");
+    }
+    baseData = (message *) (basePtr + sizeof(int)); 
 
     readAndCopyData(dataToRead, memfd, semaphore, baseData);
-
-    munmap(basePtr, sizeof(int) + sizeof(sem_t) + sizeof(message) * dataToRead);
+    sem_close(semaphore);
+    munmap(basePtr, memSize);
     close(memfd);
     return 0;
 }

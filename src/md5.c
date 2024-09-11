@@ -12,21 +12,25 @@
 #define INTIAL_LOAD 2 
 #include "../include/md5Lib.h"
 
-
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
 void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty);
 
 int main(int argc, char const *argv[])
 {
     int filesQty = argc - 1;
-    int shmSize = sizeof(argc) + sizeof(sem_t) + sizeof(message) * filesQty;
+    int shmSize = sizeof(argc) + sizeof(message) * filesQty;
     int shmFd,index =1,idxOut=0;
     int childsQty = (filesQty > CHILDS_QTY)? CHILDS_QTY:filesQty;
 
     void * shm_ptrBase = createSharedMemory(SHM_NAME,shmSize,&shmFd);
     *((int *)(shm_ptrBase)) = filesQty;
-    sem_t *semAddress = (sem_t *)shm_ptrBase + sizeof(argc);
-    message* output = (message *)(shm_ptrBase + sizeof(sem_t) + sizeof(filesQty));
+    message* output = (message *)(shm_ptrBase + sizeof(filesQty));
+    sem_t * semAddress = sem_open(SHM_NAME, O_CREAT, 0666, 0);
+
+    if (semAddress == SEM_FAILED) {
+        destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
+        ERRORMSG("sem_init")
+    }
 
     int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*filesQty;
     char* bufferPipe = calloc(INTIAL_LOAD,sizeBufferPipe);
@@ -34,17 +38,10 @@ int main(int argc, char const *argv[])
     int md5SendData[CHILDS_QTY][2],slaveSendData[CHILDS_QTY][2];
     pid_t pids[CHILDS_QTY];
 
-    if (sem_init(semAddress, 1, 0) == -1) {
-        free(bufferPipe);
-        destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
-        ERRORMSG("sem_init")
-    }
-
     write(STDOUT_FILENO, SHM_NAME, strlen(SHM_NAME));
     sleep(3);
     createChildsAndPipes(childsQty,md5SendData,slaveSendData,pids);
  
-
     int fdResults = open("results.txt", O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdResults == -1) {
         free(bufferPipe);
@@ -52,7 +49,6 @@ int main(int argc, char const *argv[])
         destroySharedMemory(SHM_NAME,shm_ptrBase,shmFd,shmSize);
         ERRORMSG("Error opening results.txt");
     }
-
 
     for(int i = 0; i<childsQty; i++) {
         sendData(md5SendData[i][1],(argv+index),&filesQty,&index,INTIAL_LOAD,MAXFILELEN+1);
@@ -92,14 +88,9 @@ int main(int argc, char const *argv[])
                 }
             }
         }
-
     }
-
-
-
-
-
     sem_close(semAddress);
+    sem_unlink(SHM_NAME);
     for (int j=0;j< childsQty; j++) {
         close(md5SendData[j][1]);
         close(slaveSendData[j][0]);
@@ -113,8 +104,6 @@ int main(int argc, char const *argv[])
 
     return 0;
 }
-
-
 
 void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty){
     FD_ZERO(read_fds);
@@ -135,5 +124,4 @@ void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr
         free(bufferPipe);
     }
     destroySharedMemory(shmName,shmPtr,shmFd,shmSize);
-    
 }
