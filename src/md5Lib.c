@@ -46,32 +46,61 @@ int createChildsAndPipes (int childsQty,int  md5SendData[][2],int  slaveSendData
 
 
 
-void sendData(int fd, const char *message[],int* dataLeft,int* idx,int qty, int dataSize) {
-
-    char* tmpBuffer = calloc(qty,dataSize);
-    if(tmpBuffer == NULL ){
-        ERRORMSG("Error allocating memory");
-    }
-
-    int sizeTotal = qty*dataSize; 
-    int len = 0;
-    tmpBuffer[len] = '\0';
-    if(*dataLeft > 0){
-    for (int i = 0; i < qty && (*dataLeft) > 0 ; i++)
-    {
-        if (i > 0) {
-            len += snprintf(tmpBuffer + len, sizeTotal - len, "%s", " ");
-        }
-        len += snprintf(tmpBuffer + len, sizeTotal - len, "%s", message[i]);
+void sendData(int fd, const char *message[], int *dataLeft, int *idx, int qty, int dataSize) {
+    for (int i = 0; i < qty && (*dataLeft) > 0; i++) {
+        char tmpBuffer[dataSize]; 
+        int len = snprintf(tmpBuffer, sizeof(tmpBuffer), "%s\n", message[i]);
+        write(fd, tmpBuffer, len);
         (*dataLeft)--;
         (*idx)++;
     }
-    
-    snprintf(tmpBuffer + len, sizeTotal - len, "\n");
-   
-    write(fd,tmpBuffer,strlen(tmpBuffer));
-    }
-    free(tmpBuffer);
 }
 
 
+
+
+void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty){
+    FD_ZERO(read_fds);
+        for (int i = 0; i < childsQty; i++)
+        {
+             FD_SET(slaveSendData[i][0],read_fds);
+        }
+    select(slaveSendData[childsQty-1][0]+1,read_fds,NULL,NULL,NULL);
+}
+
+
+
+
+void processChild(fd_set* read_fds,int slaveSendData,int sizeBufferPipe,pid_t pid,int* idxOut,message* shmPtr,sem_t * semAddress,int fdOut){
+            if(FD_ISSET(slaveSendData,read_fds)) {
+                char* token;
+                char bufferPipe[sizeBufferPipe];
+                int nullTerminated = read(slaveSendData,bufferPipe,sizeBufferPipe);
+                
+                bufferPipe[nullTerminated] = '\0';
+                token = strtok(bufferPipe," \n");
+                while (token != NULL)
+                {      
+                    strcpy(shmPtr[(*idxOut)].md5,token);
+                    token = strtok(NULL," \n");                    
+                    strncpy(shmPtr[(*idxOut)].filename,token, MAXFILELEN);
+                    shmPtr[(*idxOut)].pid = pid;
+                    char tmpBuffer[sizeof("Filename: %s - PID: %d - MD5: %s\n") + MD5LEN + MAXFILELEN + 2]={'\0'};
+                    snprintf(tmpBuffer, sizeof(tmpBuffer),"Filename: %s - PID: %d - MD5: %s\n", shmPtr[*idxOut].filename, pid, shmPtr[*idxOut].md5);
+                    sem_post(semAddress);
+                    write(fdOut,tmpBuffer,strlen(tmpBuffer));
+                    (*idxOut)++;
+                    token = strtok(NULL," \n");
+                }
+            }
+}
+
+
+void terminateChildren(int qty,int md5SendData[][2],int slaveSendData[][2], pid_t pids[]){
+    
+    for (int j=0;j< qty; j++) {
+        close(md5SendData[j][1]);
+        close(slaveSendData[j][0]);
+        waitpid(pids[j],NULL,0);
+    }
+}
