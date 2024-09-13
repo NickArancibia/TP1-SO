@@ -14,7 +14,7 @@
 #define W_END 1
 
 int createChildsAndPipes(int childsQty,int  md5SendData[][2],int slaveSendData[][2],int * pids);
-void sendData(int fd,char const *message[],int* dataLeft,int* idx,int qty, int dataSize);
+void sendData(int fd,char const *message[],int* dataLeft,int* idx,int qty);
 void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty);
 void processChild(fd_set* read_fds,int slaveSendData,int sizeBufferPipe,pid_t pid,int* idxOut,message* shmPtr,sem_t * semAddress,int fdOut);
 void terminateChildren(int qty,int md5SendData[][2],int slaveSendData[][2], pid_t pids[]);

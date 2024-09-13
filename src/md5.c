@@ -9,7 +9,8 @@
 #include "../include/vistaLib.h"
 #define CHILDS_QTY 255
 #define SHM_NAME "sharedMemory"
-#define INTIAL_LOAD 3 
+#define INITIAL_LOAD_PERCENTAGE 0.1 
+#define DEFAULT 1
 #include "../include/md5Lib.h"
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
 
@@ -20,7 +21,8 @@ int main(int argc, char const *argv[])
     int shmFd,index =1,dataRead=0;
     int childsQty = (filesQty > CHILDS_QTY)? CHILDS_QTY:(filesQty/10);
     if(childsQty ==0){ childsQty = 1;}
-    
+    int initialLoad = ((int)((filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE )> 0) ? (filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE : DEFAULT;
+
     void * shm_ptrBase = createSharedMemory(SHM_NAME,shmSize,&shmFd);
     *((int *)(shm_ptrBase)) = filesQty;
     message* output = (message *)(shm_ptrBase + sizeof(filesQty));
@@ -31,7 +33,7 @@ int main(int argc, char const *argv[])
         ERRORMSG("sem_init")
     }
 
-    int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*INTIAL_LOAD;
+    int sizeBufferPipe = (MAXFILELEN+MD5LEN+4)*initialLoad;
     char* bufferPipe = calloc(1,sizeBufferPipe);
 
     if(bufferPipe == NULL){
@@ -56,7 +58,7 @@ int main(int argc, char const *argv[])
     }
 
     for(int i = 0; i<childsQty; i++) {
-        sendData(md5SendData[i][W_END],(argv+index),&filesQty,&index,INTIAL_LOAD,MAXFILELEN);
+        sendData(md5SendData[i][W_END],(argv+index),&filesQty,&index,initialLoad);
     }
 
     fd_set read_fds;
@@ -67,7 +69,7 @@ int main(int argc, char const *argv[])
             if(FD_ISSET(slaveSendData[i][R_END],&read_fds)) {
 		        processChild(&read_fds,slaveSendData[i][R_END],sizeBufferPipe,pids[i],&dataRead,output,semAddress,fdResults);
                  if(filesQty >0){
-                   sendData(md5SendData[i][W_END],(argv+index),&filesQty,&index,1,MAXFILELEN);
+                   sendData(md5SendData[i][W_END],(argv+index),&filesQty,&index,1);
                 }
             }
         }

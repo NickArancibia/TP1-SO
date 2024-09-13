@@ -46,11 +46,11 @@ int createChildsAndPipes (int childsQty,int  md5SendData[][2],int  slaveSendData
 
 
 
-void sendData(int fd, const char *message[], int *dataLeft, int *idx, int qty, int dataSize) {
+void sendData(int fd, const char *message[], int *dataLeft, int *idx, int qty) {
     for (int i = 0; i < qty && (*dataLeft) > 0; i++) {
-        char tmpBuffer[dataSize]; 
-        int len = snprintf(tmpBuffer, sizeof(tmpBuffer), "%s\n", message[i]);
-        write(fd, tmpBuffer, len);
+        char tmpBuffer[MAXFILELEN]={'\0'}; 
+        snprintf(tmpBuffer, sizeof(tmpBuffer), "%s\n", message[i]);
+        write(fd, tmpBuffer, MAXFILELEN);
         (*dataLeft)--;
         (*idx)++;
     }
