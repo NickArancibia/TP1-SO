@@ -7,7 +7,6 @@
 #include <sys/mman.h>
 #include "definitions.h"
 
-
 typedef struct {
     char md5[MD5LEN+1], filename[MAXFILELEN+1];
     pid_t pid;

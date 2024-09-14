@@ -7,10 +7,10 @@
 #include <sys/wait.h>
 #include "../include/sharedMemory.h"
 #include "../include/vistaLib.h"
-#define CHILDS_QTY 255
+#define CHILDS_QTY 4
 #define SHM_NAME "sharedMemory"
-#define INITIAL_LOAD_PERCENTAGE 0.1 
-#define DEFAULT 1
+#define INITIAL_LOAD_PERCENTAGE 0 
+#define DEFAULT 2
 #include "../include/md5Lib.h"
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
 
@@ -74,7 +74,6 @@ int main(int argc, char const *argv[])
             }
         }
     }
-    
     terminateChildren(childsQty,md5SendData,slaveSendData,pids);
     close(fdResults);
     freeResources(bufferPipe,semAddress,SHM_NAME,shm_ptrBase,shmSize,shmFd);
@@ -83,13 +82,11 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-
-
-
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmSize,int shmFd){
     if(semAddress != NULL){
         sem_close(semAddress);
         sem_destroy(semAddress);
+        sem_unlink(shmName);
     }
     if(bufferPipe != NULL){
         free(bufferPipe);

@@ -44,8 +44,6 @@ int createChildsAndPipes (int childsQty,int  md5SendData[][2],int  slaveSendData
     return 0;
 }
 
-
-
 void sendData(int fd, const char *message[], int *dataLeft, int *idx, int qty) {
     for (int i = 0; i < qty && (*dataLeft) > 0; i++) {
         char tmpBuffer[MAXFILELEN]={'\0'}; 
@@ -56,9 +54,6 @@ void sendData(int fd, const char *message[], int *dataLeft, int *idx, int qty) {
     }
 }
 
-
-
-
 void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty){
     FD_ZERO(read_fds);
         for (int i = 0; i < childsQty; i++)
@@ -67,9 +62,6 @@ void listenChilds(fd_set* read_fds,int slaveSendData[][2],int childsQty){
         }
     select(slaveSendData[childsQty-1][0]+1,read_fds,NULL,NULL,NULL);
 }
-
-
-
 
 void processChild(fd_set* read_fds,int slaveSendData,int sizeBufferPipe,pid_t pid,int* idxOut,message* shmPtr,sem_t * semAddress,int fdOut){
             if(FD_ISSET(slaveSendData,read_fds)) {
@@ -83,6 +75,9 @@ void processChild(fd_set* read_fds,int slaveSendData,int sizeBufferPipe,pid_t pi
                 {      
                     strcpy(shmPtr[(*idxOut)].md5,token);
                     token = strtok(NULL," \n");                    
+                    if(token == NULL){
+                        ERRORMSG("Wrong md5sum format");
+                    }
                     strncpy(shmPtr[(*idxOut)].filename,token, MAXFILELEN);
                     shmPtr[(*idxOut)].pid = pid;
                     char tmpBuffer[sizeof("Filename: %s - PID: %d - MD5: %s\n") + MD5LEN + MAXFILELEN + 2]={'\0'};
