@@ -7,11 +7,13 @@
 #include <sys/wait.h>
 #include "../include/sharedMemory.h"
 #include "../include/vistaLib.h"
-#define CHILDS_QTY 4
-#define SHM_NAME "sharedMemory"
-#define INITIAL_LOAD_PERCENTAGE 0 
-#define DEFAULT 2
 #include "../include/md5Lib.h"
+
+#define SHM_NAME "sharedMemory"
+#define CHILDS_QTY 5
+#define INITIAL_LOAD_PERCENTAGE 0.1 
+#define DEFAULT_INITIAL_LOAD 1
+#define MIN_FILES_PER_SON 20
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
 
 int main(int argc, char const *argv[])
@@ -19,13 +21,14 @@ int main(int argc, char const *argv[])
     int filesQty = argc - 1;
     int shmSize = sizeof(argc) + sizeof(message) * filesQty;
     int shmFd,index =1,dataRead=0;
-    int childsQty = (filesQty > CHILDS_QTY)? CHILDS_QTY:(filesQty/10);
-    if(childsQty ==0){ childsQty = 1;}
-    int initialLoad = ((int)((filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE )> 0) ? (filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE : DEFAULT;
+    int childsQty = (filesQty > (CHILDS_QTY * MIN_FILES_PER_SON))? CHILDS_QTY: (int)(filesQty/(MIN_FILES_PER_SON));
+    if(childsQty == 0){ childsQty = 1;}
+    int initialLoad = ((int)((filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE )> 0) ? (filesQty/childsQty)*INITIAL_LOAD_PERCENTAGE : DEFAULT_INITIAL_LOAD;
 
     void * shm_ptrBase = createSharedMemory(SHM_NAME,shmSize,&shmFd);
     *((int *)(shm_ptrBase)) = filesQty;
     message* output = (message *)(shm_ptrBase + sizeof(filesQty));
+
     sem_t * semAddress = sem_open(SHM_NAME, O_CREAT, 0666, 0);
 
     if (semAddress == SEM_FAILED) {
@@ -46,6 +49,7 @@ int main(int argc, char const *argv[])
     
     write(STDOUT_FILENO, SHM_NAME, strlen(SHM_NAME));
     sleep(3);
+    
     if(createChildsAndPipes(childsQty,md5SendData,slaveSendData,pids) !=0){
         freeResources(bufferPipe,semAddress,SHM_NAME,shm_ptrBase,shmSize,shmFd);
         ERRORMSG("Error creating childs and pipes");
