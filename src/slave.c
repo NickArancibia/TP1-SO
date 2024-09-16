@@ -1,6 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -8,8 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
-//#include <definitions.h>
-#define MAXFILELEN 100
+#include "../include/definitions.h"
 
 char * md5Path = "/usr/bin/md5sum";
 
@@ -22,7 +18,7 @@ int main(int argc, char *argv[]){
         return EXIT_FAILURE;
     }
 
-    char buffer[MAXFILELEN];
+    char buffer[MAXFILELEN]={0};
     int bytesread;
 
     while((bytesread = read(STDIN_FILENO, buffer, MAXFILELEN)) != 0){
