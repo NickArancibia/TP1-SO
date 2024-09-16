@@ -94,8 +94,8 @@ void processChild(fd_set* read_fds,int slaveSendData,int sizeBufferPipe,pid_t pi
 void terminateChildren(int qty,int md5SendData[][2],int slaveSendData[][2], pid_t pids[]){
     
     for (int j=0;j< qty; j++) {
-        close(md5SendData[j][1]);
-        close(slaveSendData[j][0]);
+        close(md5SendData[j][W_END]);
+        close(slaveSendData[j][R_END]);
         waitpid(pids[j],NULL,0);
     }
 }
