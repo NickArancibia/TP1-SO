@@ -13,7 +13,8 @@
 #define CHILDS_QTY 5
 #define INITIAL_LOAD_PERCENTAGE 0.1 
 #define DEFAULT_INITIAL_LOAD 1
-#define MIN_FILES_PER_SON 4*DEFAULT_INITIAL_LOAD
+#define MIN_FILES_PER_SON (4*DEFAULT_INITIAL_LOAD)
+
 void freeResources(char* bufferPipe,sem_t* semAddress,char* shmName,void* shmPtr,int shmsize,int shmFd);
 
 int main(int argc, char const *argv[])
